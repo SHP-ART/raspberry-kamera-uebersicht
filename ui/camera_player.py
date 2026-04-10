@@ -1,6 +1,6 @@
 try:
     import vlc
-except ImportError:
+except (ImportError, OSError):
     vlc = None  # type: ignore
 
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel

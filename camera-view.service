@@ -1,0 +1,15 @@
+[Unit]
+Description=Raspberry Pi Kameraübersicht
+After=graphical.target
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+WorkingDirectory=/home/pi/raspberry-kamera-uebersicht
+ExecStart=/usr/bin/python3 /home/pi/raspberry-kamera-uebersicht/main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
