@@ -4,12 +4,14 @@ except ImportError:
     vlc = None  # type: ignore
 
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMetaObject, Q_ARG
 
 
 class CameraPlayer(QFrame):
 
     RECONNECT_INTERVAL_MS = 30_000
+
+    _state_changed = pyqtSignal(str)  # "playing" | "no_signal"
 
     def __init__(self, cam_config: dict, parent=None):
         super().__init__(parent)
@@ -19,6 +21,7 @@ class CameraPlayer(QFrame):
         self._reconnect_timer = QTimer(self)
         self._reconnect_timer.setInterval(self.RECONNECT_INTERVAL_MS)
         self._reconnect_timer.timeout.connect(self._start_stream)
+        self._state_changed.connect(self._apply_state)
 
         self.setStyleSheet("background-color: #000000;")
         self._layout = QVBoxLayout(self)
@@ -54,6 +57,13 @@ class CameraPlayer(QFrame):
     def is_placeholder(self) -> bool:
         return not self._config.get("enabled", False) or not self._config.get("url", "")
 
+    def _apply_state(self, state: str):
+        """Wird immer im Main-Thread aufgerufen (via Signal)."""
+        if state == "playing":
+            self._hide_overlay()
+        else:
+            self._show_no_signal()
+
     def _show_placeholder(self):
         self._overlay.setText(f"+\n{self._config.get('name', 'Nicht konfiguriert')}")
         self._overlay.setStyleSheet("color: #444444; background-color: transparent; font-size: 14px;")
@@ -71,6 +81,10 @@ class CameraPlayer(QFrame):
         self._reconnect_timer.stop()
 
     def _init_vlc(self):
+        if vlc is None:
+            raise RuntimeError(
+                "VLC ist nicht installiert. Bitte 'sudo apt install vlc' und 'pip3 install python-vlc' ausführen."
+            )
         self._vlc_instance = vlc.Instance("--no-xlib", "--quiet")
         self._media_player = self._vlc_instance.media_player_new()
         em = self._media_player.event_manager()
@@ -87,13 +101,15 @@ class CameraPlayer(QFrame):
         self._media_player.set_media(media)
         self._media_player.set_xwindow(int(self.winId()))
         self._media_player.play()
-        self._show_no_signal()
+        self._state_changed.emit("no_signal")
 
     def _on_playing(self, event):
-        self._hide_overlay()
+        """VLC-Callback — läuft in VLC-Background-Thread. Nur Signal emittieren."""
+        self._state_changed.emit("playing")
 
     def _on_error(self, event):
-        self._show_no_signal()
+        """VLC-Callback — läuft in VLC-Background-Thread. Nur Signal emittieren."""
+        self._state_changed.emit("no_signal")
 
     def stop(self):
         if self._media_player:
