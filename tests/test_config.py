@@ -3,7 +3,7 @@ import os
 import pytest
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from main import load_config
+from config import load_config
 
 def test_load_config_returns_8_cameras(tmp_path):
     cfg = {
@@ -28,5 +28,5 @@ def test_load_config_invalid_type_raises(tmp_path):
     }
     p = tmp_path / "config.json"
     p.write_text(json.dumps(cfg))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Ungültiger"):
         load_config(str(p))
