@@ -34,18 +34,21 @@ class SettingsDialog(QDialog):
     list_layout.addWidget(QLabel("KAMERA-EINSTELLUNGEN", list_page))
     self._list_widget = QListWidget(list_page)
     self._list_widget.setStyleSheet(
-      "background-color: #1a1a2e; color: #a8dadc; font-size: 13px;"
+      "background-color: #1a1a2e; color: #a8dadc; font-size: 15px;"
+      "QListWidget::item { min-height: 48px; padding: 4px 8px; }"
+      "QListWidget::item:selected { background-color: #0f3460; }"
     )
+    self._list_widget.setSpacing(4)
     self._list_widget.itemClicked.connect(self._open_detail)
     self._refresh_list()
     list_layout.addWidget(self._list_widget, 1)
 
     btn_row = QHBoxLayout()
     cancel_btn = QPushButton("Abbrechen")
-    cancel_btn.setStyleSheet("background-color: #333333; color: #aaaaaa; padding: 6px 16px;")
+    cancel_btn.setStyleSheet("background-color: #333333; color: #aaaaaa; padding: 10px 20px; font-size: 14px;")
     cancel_btn.clicked.connect(self.reject)
     save_btn = QPushButton("Speichern & Neu laden")
-    save_btn.setStyleSheet("background-color: #e94560; color: white; padding: 6px 16px;")
+    save_btn.setStyleSheet("background-color: #e94560; color: white; padding: 10px 20px; font-size: 14px;")
     save_btn.clicked.connect(self._accept_changes)
     btn_row.addWidget(cancel_btn)
     btn_row.addStretch()
@@ -61,12 +64,14 @@ class SettingsDialog(QDialog):
 
     detail_layout.addWidget(QLabel("NAME", detail_page))
     self._name_edit = QLineEdit(detail_page)
-    self._name_edit.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 6px;")
+    self._name_edit.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 10px; font-size: 14px;")
+    self._name_edit.setMinimumHeight(44)
     detail_layout.addWidget(self._name_edit)
 
     detail_layout.addWidget(QLabel("STREAM-URL", detail_page))
     self._url_edit = QLineEdit(detail_page)
-    self._url_edit.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 6px;")
+    self._url_edit.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 10px; font-size: 14px;")
+    self._url_edit.setMinimumHeight(44)
     detail_layout.addWidget(self._url_edit)
 
     detail_layout.addWidget(QLabel("TYP", detail_page))
@@ -75,9 +80,10 @@ class SettingsDialog(QDialog):
     self._mjpeg_btn = QPushButton("MJPEG")
     for btn in (self._rtsp_btn, self._mjpeg_btn):
       btn.setCheckable(True)
+      btn.setMinimumHeight(44)
       btn.setStyleSheet(
         "QPushButton:checked { background-color: #e94560; color: white; }"
-        "QPushButton { background-color: #0f3460; color: #888888; padding: 5px 14px; }"
+        "QPushButton { background-color: #0f3460; color: #888888; padding: 10px 20px; font-size: 14px; }"
       )
     self._rtsp_btn.clicked.connect(lambda: self._set_type("rtsp"))
     self._mjpeg_btn.clicked.connect(lambda: self._set_type("mjpeg"))
@@ -88,7 +94,8 @@ class SettingsDialog(QDialog):
 
     test_row = QHBoxLayout()
     test_btn = QPushButton("Verbindung testen")
-    test_btn.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 5px 14px;")
+    test_btn.setMinimumHeight(44)
+    test_btn.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 10px 20px; font-size: 14px;")
     test_btn.clicked.connect(self._test_connection)
     self._test_result = QLabel("", detail_page)
     test_row.addWidget(test_btn)
@@ -99,10 +106,12 @@ class SettingsDialog(QDialog):
     detail_layout.addStretch()
     detail_btn_row = QHBoxLayout()
     back_btn = QPushButton("Zurück")
-    back_btn.setStyleSheet("background-color: #333333; color: #aaaaaa; padding: 6px 16px;")
+    back_btn.setMinimumHeight(44)
+    back_btn.setStyleSheet("background-color: #333333; color: #aaaaaa; padding: 10px 20px; font-size: 14px;")
     back_btn.clicked.connect(self._back_to_list)
     apply_btn = QPushButton("Übernehmen")
-    apply_btn.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 6px 16px;")
+    apply_btn.setMinimumHeight(44)
+    apply_btn.setStyleSheet("background-color: #0f3460; color: #a8dadc; padding: 10px 20px; font-size: 14px;")
     apply_btn.clicked.connect(self._apply_detail)
     detail_btn_row.addWidget(back_btn)
     detail_btn_row.addStretch()
