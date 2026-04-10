@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QHBoxLayout, Q
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QColor
 from ui.camera_grid import CameraGrid
+from ui.scale import scale
 
 
 class PageIndicator(QWidget):
@@ -10,7 +11,7 @@ class PageIndicator(QWidget):
         super().__init__(parent)
         self._count = count
         self._current = 0
-        self.setFixedHeight(44)
+        self.setFixedHeight(scale(44))
 
     def set_page(self, index: int):
         self._current = index
@@ -19,8 +20,8 @@ class PageIndicator(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        dot_size = 12
-        spacing = 20
+        dot_size = scale(12)
+        spacing = scale(20)
         total_width = dot_size + (self._count - 1) * spacing
         x = (self.width() - total_width) // 2
         y = self.height() // 2
@@ -53,7 +54,7 @@ class PageView(QWidget):
         outer.addWidget(self._stack, 1)
 
         nav_bar = QWidget(self)
-        nav_bar.setFixedHeight(44)
+        nav_bar.setFixedHeight(scale(44))
         nav_bar.setStyleSheet("background-color: #111111;")
         nav_layout = QHBoxLayout(nav_bar)
         nav_layout.setContentsMargins(6, 0, 6, 0)
@@ -64,9 +65,9 @@ class PageView(QWidget):
         nav_layout.addStretch()
 
         settings_btn = QPushButton("⚙", nav_bar)
-        settings_btn.setFixedSize(40, 40)
+        settings_btn.setFixedSize(scale(40), scale(40))
         settings_btn.setStyleSheet(
-            "background-color: #333333; color: #aaaaaa; border:none; font-size:18px;"
+            f"background-color: #333333; color: #aaaaaa; border:none; font-size:{scale(18)}px;"
         )
         settings_btn.clicked.connect(self._open_settings)
         nav_layout.addWidget(settings_btn)

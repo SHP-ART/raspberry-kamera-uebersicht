@@ -5,6 +5,7 @@ except (ImportError, OSError):
 
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMetaObject, Q_ARG
+from ui.scale import scale
 
 
 class CameraPlayer(QFrame):
@@ -34,15 +35,15 @@ class CameraPlayer(QFrame):
 
         self._name_label = QLabel(cam_config.get("name", ""), self)
         self._name_label.setStyleSheet(
-            "color: white; background-color: rgba(0,0,0,150);"
-            "padding: 2px 6px; font-size: 11px;"
+            f"color: white; background-color: rgba(0,0,0,150);"
+            f"padding: 2px 6px; font-size: {scale(11)}px;"
         )
         self._name_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
 
         self._live_badge = QLabel("LIVE", self)
         self._live_badge.setStyleSheet(
-            "color: white; background-color: #e94560;"
-            "padding: 1px 5px; font-size: 9px; font-weight: bold;"
+            f"color: white; background-color: #e94560;"
+            f"padding: 1px 5px; font-size: {scale(9)}px; font-weight: bold;"
         )
         self._live_badge.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self._live_badge.hide()
@@ -66,12 +67,12 @@ class CameraPlayer(QFrame):
 
     def _show_placeholder(self):
         self._overlay.setText(f"+\n{self._config.get('name', 'Nicht konfiguriert')}")
-        self._overlay.setStyleSheet("color: #444444; background-color: transparent; font-size: 14px;")
+        self._overlay.setStyleSheet(f"color: #444444; background-color: transparent; font-size: {scale(14)}px;")
         self._live_badge.hide()
 
     def _show_no_signal(self):
         self._overlay.setText(f"Kein Signal\n{self._config.get('name', '')}")
-        self._overlay.setStyleSheet("color: #888888; background-color: transparent; font-size: 13px;")
+        self._overlay.setStyleSheet(f"color: #888888; background-color: transparent; font-size: {scale(13)}px;")
         self._live_badge.hide()
         self._reconnect_timer.start()
 
@@ -128,5 +129,6 @@ class CameraPlayer(QFrame):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._name_label.setGeometry(0, self.height() - 22, self.width(), 22)
-        self._live_badge.setGeometry(4, 4, 40, 16)
+        label_h = scale(22)
+        self._name_label.setGeometry(0, self.height() - label_h, self.width(), label_h)
+        self._live_badge.setGeometry(scale(4), scale(4), scale(40), scale(16))
