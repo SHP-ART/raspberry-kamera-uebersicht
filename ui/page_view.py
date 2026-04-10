@@ -21,7 +21,7 @@ class PageIndicator(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         dot_size = 8
         spacing = 14
-        total_width = self._count * dot_size + (self._count - 1) * (spacing - dot_size)
+        total_width = dot_size + (self._count - 1) * spacing
         x = (self.width() - total_width) // 2
         y = self.height() // 2
         for i in range(self._count):
@@ -84,6 +84,7 @@ class PageView(QWidget):
         self._indicator.set_page(1)
 
     def _open_settings(self):
+        # Deferred import to avoid circular dependency (SettingsDialog -> CameraPlayer -> ...)
         from ui.settings_dialog import SettingsDialog
         dialog = SettingsDialog(self._cameras, self)
         if dialog.exec_():
