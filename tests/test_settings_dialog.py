@@ -43,11 +43,15 @@ def test_apply_detail_updates_pending():
     dialog._current_index = 2
     dialog._name_edit.setText("Gartentor")
     dialog._url_edit.setText("rtsp://10.0.0.1/live")
+    dialog._username_edit.setText("admin")
+    dialog._password_edit.setText("secret")
     dialog._set_type("rtsp")
     with patch.object(dialog, "_back_to_list"):
         dialog._apply_detail()
     assert dialog._pending[2]["name"] == "Gartentor"
     assert dialog._pending[2]["url"] == "rtsp://10.0.0.1/live"
+    assert dialog._pending[2]["username"] == "admin"
+    assert dialog._pending[2]["password"] == "secret"
     assert dialog._pending[2]["enabled"] is True
 
 

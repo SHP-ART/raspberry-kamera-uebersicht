@@ -2,6 +2,12 @@ import json
 
 EXPECTED_CAMERA_COUNT = 8
 
+
+def save_config(path: str, cameras: list[dict]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"cameras": cameras}, f, indent=2, ensure_ascii=False)
+
+
 def load_config(path: str) -> list[dict]:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)

@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QHBoxLayout, Q
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QColor
 from ui.camera_grid import CameraGrid
+from ui.camera_player import CameraPlayer
 from ui.scale import scale
 
 
@@ -35,11 +36,42 @@ class PageIndicator(QWidget):
             x += spacing
 
 
+class _FullscreenOverlay(QWidget):
+
+    def __init__(self, cam_config: dict, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet("background-color: #000000;")
+
+        self._player = CameraPlayer(cam_config, self)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._player)
+
+        self._close_btn = QPushButton("✕", self)
+        self._close_btn.setFixedSize(scale(48), scale(48))
+        self._close_btn.setStyleSheet(
+            f"background-color: rgba(0,0,0,160); color: white; border: none; font-size: {scale(20)}px;"
+        )
+        self._close_btn.clicked.connect(self.close_overlay)
+        self._close_btn.raise_()
+
+    def close_overlay(self):
+        self._player.stop()
+        self.hide()
+        self.deleteLater()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._close_btn.move(self.width() - self._close_btn.width() - scale(4), scale(4))
+
+
 class PageView(QWidget):
 
     def __init__(self, cameras: list[dict], parent=None):
         super().__init__(parent)
         self._cameras = cameras
+        self._fullscreen_overlay: _FullscreenOverlay | None = None
         self.setStyleSheet("background-color: #000000;")
 
         outer = QVBoxLayout(self)
@@ -75,6 +107,8 @@ class PageView(QWidget):
 
         self._grid_page1.swipe_left.connect(self._go_to_page2)
         self._grid_page2.swipe_right.connect(self._go_to_page1)
+        self._grid_page1.fullscreen_requested.connect(self._show_fullscreen)
+        self._grid_page2.fullscreen_requested.connect(self._show_fullscreen)
 
     def _go_to_page1(self):
         self._stack.setCurrentIndex(0)
@@ -83,6 +117,15 @@ class PageView(QWidget):
     def _go_to_page2(self):
         self._stack.setCurrentIndex(1)
         self._indicator.set_page(1)
+
+    def _show_fullscreen(self, cam_config: dict):
+        if self._fullscreen_overlay is not None:
+            self._fullscreen_overlay.close_overlay()
+        overlay = _FullscreenOverlay(cam_config, self)
+        overlay.setGeometry(0, 0, self.width(), self.height())
+        overlay.show()
+        overlay.raise_()
+        self._fullscreen_overlay = overlay
 
     def _open_settings(self):
         # Deferred import to avoid circular dependency (SettingsDialog -> CameraPlayer -> ...)

@@ -7,6 +7,7 @@ class CameraGrid(QWidget):
 
     swipe_left = pyqtSignal()
     swipe_right = pyqtSignal()
+    fullscreen_requested = pyqtSignal(dict)
 
     SWIPE_MIN_HORIZONTAL = 50
     SWIPE_MAX_VERTICAL = 100
@@ -23,6 +24,7 @@ class CameraGrid(QWidget):
         for i, cam_config in enumerate(cameras[:4]):
             row, col = divmod(i, 2)
             player = CameraPlayer(cam_config, self)
+            player.fullscreen_requested.connect(self.fullscreen_requested)
             self._players.append(player)
             layout.addWidget(player, row, col)
 
