@@ -1,0 +1,12 @@
+{
+  "cameras": [
+    {"name": "Kamera 1", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 2", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 3", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 4", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 5", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 6", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 7", "url": "", "type": "rtsp", "enabled": false},
+    {"name": "Kamera 8", "url": "", "type": "rtsp", "enabled": false}
+  ]
+}
