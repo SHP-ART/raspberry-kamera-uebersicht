@@ -29,8 +29,8 @@ class CameraGrid(QWidget):
         self.setAttribute(Qt.WA_AcceptTouchEvents, True)
 
     def reload_cameras(self, cameras: list[dict]):
-        for i, player in enumerate(self._players):
-            player.reload(cameras[i])
+        for player, cam_config in zip(self._players, cameras):
+            player.reload(cam_config)
 
     def stop_all(self):
         for player in self._players:
@@ -38,9 +38,11 @@ class CameraGrid(QWidget):
 
     def mousePressEvent(self, event):
         self._touch_start = event.pos()
+        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         if self._touch_start is None:
+            super().mouseReleaseEvent(event)
             return
         delta = event.pos() - self._touch_start
         self._touch_start = None
@@ -49,3 +51,4 @@ class CameraGrid(QWidget):
                 self.swipe_left.emit()
             else:
                 self.swipe_right.emit()
+        super().mouseReleaseEvent(event)
