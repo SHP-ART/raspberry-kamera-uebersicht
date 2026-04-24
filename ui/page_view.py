@@ -1,9 +1,13 @@
+import logging
+
 from PyQt5.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QColor
 from ui.camera_grid import CameraGrid
 from ui.camera_player import CameraPlayer
 from ui.scale import scale
+
+logger = logging.getLogger(__name__)
 
 
 class PageIndicator(QWidget):
@@ -130,12 +134,16 @@ class PageView(QWidget):
     def _open_settings(self):
         # Deferred import to avoid circular dependency (SettingsDialog -> CameraPlayer -> ...)
         from ui.settings_dialog import SettingsDialog
+        logger.info("Einstellungsdialog geöffnet")
         dialog = SettingsDialog(self._cameras, self)
         if dialog.exec_():
             updated = dialog.get_cameras()
             self._cameras = updated
             self._grid_page1.reload_cameras(updated[0:4])
             self._grid_page2.reload_cameras(updated[4:8])
+            logger.info("Einstellungen übernommen, Kameras werden neu geladen")
+        else:
+            logger.debug("Einstellungsdialog abgebrochen")
 
     def reload_all(self, cameras: list[dict]):
         self._cameras = cameras

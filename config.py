@@ -1,6 +1,9 @@
 import json
+import logging
 
 EXPECTED_CAMERA_COUNT = 8
+
+logger = logging.getLogger(__name__)
 
 
 def save_config(path: str, cameras: list[dict]) -> None:
@@ -9,6 +12,7 @@ def save_config(path: str, cameras: list[dict]) -> None:
 
 
 def load_config(path: str) -> list[dict]:
+    logger.info("Lade Konfiguration aus %s", path)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     cameras = data.get("cameras", [])
@@ -20,4 +24,5 @@ def load_config(path: str) -> list[dict]:
     for cam in cameras:
         if cam.get("type") not in ("rtsp", "mjpeg"):
             raise ValueError(f"Ungültiger Kamera-Typ: {cam.get('type')!r}")
+    logger.info("Konfiguration geladen: %d Kameras", len(cameras))
     return cameras

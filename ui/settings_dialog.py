@@ -1,4 +1,7 @@
+import base64
 import copy
+import json
+import logging
 import os
 import socket
 import urllib.parse
@@ -13,6 +16,8 @@ from ui.scale import scale
 
 
 class SettingsDialog(QDialog):
+
+  _logger = logging.getLogger(__name__)
 
   def __init__(self, cameras: list, parent=None):
     super().__init__(parent)
@@ -69,11 +74,11 @@ class SettingsDialog(QDialog):
     self._name_edit.setMinimumHeight(scale(44))
     detail_layout.addWidget(self._name_edit)
 
-    detail_layout.addWidget(QLabel("STREAM-URL", detail_page))
+    detail_layout.addWidget(QLabel("STREAM-URL (ohne Benutzer/Passwort)", detail_page))
     self._url_edit = QLineEdit(detail_page)
+    self._url_edit.setPlaceholderText("z.B. rtsp://meine-kamera.dyndns.org:554/live  oder  http://cam.example.com/video")
     self._url_edit.setStyleSheet(f"background-color: #0f3460; color: #a8dadc; padding: {scale(10)}px; font-size: {scale(14)}px;")
     self._url_edit.setMinimumHeight(scale(44))
-    self._url_edit.setPlaceholderText("z.B. rtsp://meine-kamera.dyndns.org:554/live  oder  http://cam.example.com/video")
     detail_layout.addWidget(self._url_edit)
     url_hint = QLabel(
       "Formate: rtsp://host:554/pfad • http://host/video.mjpg • https://host/stream"
@@ -85,19 +90,23 @@ class SettingsDialog(QDialog):
     detail_layout.addWidget(url_hint)
 
     cred_row = QHBoxLayout()
-    cred_row.addWidget(QLabel("BENUTZERNAME", detail_page))
-    self._username_edit = QLineEdit(detail_page)
-    self._username_edit.setStyleSheet(f"background-color: #0f3460; color: #a8dadc; padding: {scale(10)}px; font-size: {scale(14)}px;")
-    self._username_edit.setMinimumHeight(scale(44))
-    self._username_edit.setPlaceholderText("optional")
-    cred_row.addWidget(self._username_edit)
+    cred_row.setSpacing(scale(8))
+
+    cred_row.addWidget(QLabel("BENUTZER", detail_page))
+    self._user_edit = QLineEdit(detail_page)
+    self._user_edit.setPlaceholderText("optional")
+    self._user_edit.setStyleSheet(f"background-color: #0f3460; color: #a8dadc; padding: {scale(10)}px; font-size: {scale(14)}px;")
+    self._user_edit.setMinimumHeight(scale(44))
+    cred_row.addWidget(self._user_edit, 1)
+
     cred_row.addWidget(QLabel("PASSWORT", detail_page))
-    self._password_edit = QLineEdit(detail_page)
-    self._password_edit.setStyleSheet(f"background-color: #0f3460; color: #a8dadc; padding: {scale(10)}px; font-size: {scale(14)}px;")
-    self._password_edit.setMinimumHeight(scale(44))
-    self._password_edit.setPlaceholderText("optional")
-    self._password_edit.setEchoMode(QLineEdit.Password)
-    cred_row.addWidget(self._password_edit)
+    self._pass_edit = QLineEdit(detail_page)
+    self._pass_edit.setPlaceholderText("optional")
+    self._pass_edit.setEchoMode(QLineEdit.Password)
+    self._pass_edit.setStyleSheet(f"background-color: #0f3460; color: #a8dadc; padding: {scale(10)}px; font-size: {scale(14)}px;")
+    self._pass_edit.setMinimumHeight(scale(44))
+    cred_row.addWidget(self._pass_edit, 1)
+
     detail_layout.addLayout(cred_row)
 
     detail_layout.addWidget(QLabel("TYP", detail_page))
@@ -148,6 +157,10 @@ class SettingsDialog(QDialog):
   def _refresh_list(self):
     self._list_widget.clear()
     for cam in self._pending:
+      url_display = cam.get("url", "")[:40]
+      user = cam.get("user", "")
+      if user:
+        url_display += f"  ({user})"
       enabled = cam.get("enabled", False) and cam.get("url", "")
       if not cam.get("url"):
         status = "NICHT KONFIGURIERT"
@@ -156,9 +169,32 @@ class SettingsDialog(QDialog):
       else:
         status = "DEAKTIVIERT"
       item = QListWidgetItem(
-        f"{cam['name']}  |  {cam.get('url', '')[:40]}  |  {status}"
+        f"{cam['name']}  |  {url_display}  |  {status}"
       )
       self._list_widget.addItem(item)
+
+  @staticmethod
+  def _parse_url_credentials(url: str) -> tuple[str, str, str]:
+    """Extrahiert Benutzer/Passwort aus einer URL.
+
+    Gibt (bereinigte_url, benutzer, passwort) zurück.
+    Eingabe:  rtsp://admin:geheim@192.168.1.1:554/stream
+    Ausgabe:  ('rtsp://192.168.1.1:554/stream', 'admin', 'geheim')
+    """
+    if not url:
+      return ("", "", "")
+    try:
+      parsed = urllib.parse.urlparse(url)
+      if parsed.username or parsed.password:
+        user = urllib.parse.unquote(parsed.username or "")
+        password = urllib.parse.unquote(parsed.password or "")
+        clean = parsed._replace(netloc=parsed.hostname)
+        if parsed.port:
+          clean = clean._replace(netloc=f"{parsed.hostname}:{parsed.port}")
+        return (urllib.parse.urlunparse(clean), user, password)
+    except Exception:
+      pass
+    return (url, "", "")
 
   def _open_detail(self, item: QListWidgetItem):
     idx = self._list_widget.row(item)
@@ -168,9 +204,23 @@ class SettingsDialog(QDialog):
     cam = self._pending[idx]
     self._detail_title.setText(f"KAMERA {idx + 1} BEARBEITEN")
     self._name_edit.setText(cam.get("name", ""))
-    self._url_edit.setText(cam.get("url", ""))
-    self._username_edit.setText(cam.get("username", ""))
-    self._password_edit.setText(cam.get("password", ""))
+
+    # URL und Credentials laden – vorhandene Credentials in URL werden aufgespalten
+    raw_url = cam.get("url", "")
+    stored_user = cam.get("user", "")
+    stored_pass = cam.get("password", "")
+    if stored_user or stored_pass:
+      # Credentials aus separaten Feldern nutzen
+      self._url_edit.setText(raw_url)
+      self._user_edit.setText(stored_user)
+      self._pass_edit.setText(stored_pass)
+    else:
+      # Versuche Credentials aus der URL zu extrahieren (Abwärtskompatibilität)
+      clean_url, parsed_user, parsed_pass = self._parse_url_credentials(raw_url)
+      self._url_edit.setText(clean_url)
+      self._user_edit.setText(parsed_user)
+      self._pass_edit.setText(parsed_pass)
+
     self._set_type(cam.get("type", "rtsp"))
     self._test_result.setText("")
     self._stack.setCurrentIndex(1)
@@ -184,8 +234,8 @@ class SettingsDialog(QDialog):
     cam = self._pending[self._current_index]
     cam["name"] = self._name_edit.text().strip()
     cam["url"] = self._url_edit.text().strip()
-    cam["username"] = self._username_edit.text().strip()
-    cam["password"] = self._password_edit.text()
+    cam["user"] = self._user_edit.text().strip()
+    cam["password"] = self._pass_edit.text().strip()
     cam["type"] = "rtsp" if self._rtsp_btn.isChecked() else "mjpeg"
     cam["enabled"] = bool(cam["url"])
     self._back_to_list()
@@ -194,19 +244,43 @@ class SettingsDialog(QDialog):
     self._refresh_list()
     self._stack.setCurrentIndex(0)
 
+  def _build_test_url(self) -> str:
+    """Baut die URL mit Credentials für den Verbindungstest."""
+    url = self._url_edit.text().strip()
+    user = self._user_edit.text().strip()
+    password = self._pass_edit.text().strip()
+    if not url or not user:
+      return url
+    try:
+      parsed = urllib.parse.urlparse(url)
+      userinfo = urllib.parse.quote(user, safe="")
+      if password:
+        userinfo += ":" + urllib.parse.quote(password, safe="")
+      netloc = userinfo + "@" + parsed.hostname
+      if parsed.port:
+        netloc += f":{parsed.port}"
+      return urllib.parse.urlunparse(parsed._replace(netloc=netloc))
+    except Exception:
+      return url
+
   def _test_connection(self):
     url = self._url_edit.text().strip()
     if not url:
       self._test_result.setText("Keine URL angegeben")
       self._test_result.setStyleSheet("color: #e94560;")
       return
+
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.hostname or ""
+    if not host:
+      self._test_result.setText("Kein Host in URL erkannt")
+      self._test_result.setStyleSheet("color: #e94560;")
+      return
+
+    user = self._user_edit.text().strip()
+    password = self._pass_edit.text().strip()
+
     try:
-      parsed = urllib.parse.urlparse(url)
-      host = parsed.hostname or ""
-      if not host:
-        self._test_result.setText("Kein Host in URL erkannt")
-        self._test_result.setStyleSheet("color: #e94560;")
-        return
       if parsed.scheme in ("rtsp", "rtsps"):
         port = parsed.port or (322 if parsed.scheme == "rtsps" else 554)
         sock = socket.create_connection((host, port), timeout=5)
@@ -214,14 +288,14 @@ class SettingsDialog(QDialog):
         self._test_result.setText(f"Host {host}:{port} erreichbar")
         self._test_result.setStyleSheet("color: #4caf50;")
       elif parsed.scheme in ("http", "https"):
-        username = self._username_edit.text().strip()
-        password = self._password_edit.text()
-        if username and not parsed.username:
-          netloc = f"{urllib.parse.quote(username, safe='')}:{urllib.parse.quote(password, safe='')}@{host}"
-          if parsed.port:
-            netloc += f":{parsed.port}"
-          url = parsed._replace(netloc=netloc).geturl()
-        urllib.request.urlopen(url, timeout=5)  # noqa: S310
+        full_url = self._build_test_url()
+        if user:
+          req = urllib.request.Request(full_url)
+          credentials = base64.b64encode(f"{user}:{password}".encode()).decode()
+          req.add_header("Authorization", f"Basic {credentials}")
+          urllib.request.urlopen(req, timeout=5)  # noqa: S310
+        else:
+          urllib.request.urlopen(full_url, timeout=5)  # noqa: S310
         self._test_result.setText("Stream erreichbar")
         self._test_result.setStyleSheet("color: #4caf50;")
       else:
@@ -243,11 +317,11 @@ class SettingsDialog(QDialog):
 
   def _save_config(self):
     import config as cfg
-    config_path = os.path.join(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-      "config.json",
-    )
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(project_dir, "config.json")
+    self._logger.info("Speichere Konfiguration nach %s", config_path)
     cfg.save_config(config_path, self._pending)
+    self._logger.debug("Konfiguration gespeichert: %d Kameras", len(self._pending))
 
   def get_cameras(self) -> list:
     if self._accepted:

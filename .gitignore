@@ -9,3 +9,5 @@ venv/
 dist/
 build/
 .superpowers/
+logs/
+.DS_Store

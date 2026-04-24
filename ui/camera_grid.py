@@ -1,6 +1,10 @@
+import logging
+
 from PyQt5.QtWidgets import QWidget, QGridLayout
-from PyQt5.QtCore import pyqtSignal, Qt, QPoint
+from PyQt5.QtCore import pyqtSignal, Qt, QPoint, QEvent
 from ui.camera_player import CameraPlayer
+
+logger = logging.getLogger(__name__)
 
 
 class CameraGrid(QWidget):
@@ -38,6 +42,27 @@ class CameraGrid(QWidget):
         for player in self._players:
             player.stop()
 
+    def event(self, event):
+        """Fängt Touch-Events ab und wandelt sie in Wischgesten um."""
+        if event.type() == QEvent.TouchBegin:
+            self._touch_start = event.touchPoints()[0].pos().toPoint()
+            return True
+        elif event.type() == QEvent.TouchEnd:
+            if self._touch_start is not None:
+                delta = event.touchPoints()[0].pos().toPoint() - self._touch_start
+                self._touch_start = None
+                if abs(delta.x()) >= self.SWIPE_MIN_HORIZONTAL and abs(delta.y()) < self.SWIPE_MAX_VERTICAL:
+                    if delta.x() < 0:
+                        logger.debug("Wischgeste: links")
+                        self.swipe_left.emit()
+                    else:
+                        logger.debug("Wischgeste: rechts")
+                        self.swipe_right.emit()
+            return True
+        elif event.type() == QEvent.TouchUpdate:
+            return True
+        return super().event(event)
+
     def mousePressEvent(self, event):
         self._touch_start = event.pos()
         super().mousePressEvent(event)
@@ -50,7 +75,9 @@ class CameraGrid(QWidget):
         self._touch_start = None
         if abs(delta.x()) >= self.SWIPE_MIN_HORIZONTAL and abs(delta.y()) < self.SWIPE_MAX_VERTICAL:
             if delta.x() < 0:
+                logger.debug("Maus-Wischgeste: links")
                 self.swipe_left.emit()
             else:
+                logger.debug("Maus-Wischgeste: rechts")
                 self.swipe_right.emit()
         super().mouseReleaseEvent(event)

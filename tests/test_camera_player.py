@@ -38,7 +38,7 @@ def test_build_stream_url_without_credentials():
         from PyQt5.QtWidgets import QApplication
         app = QApplication.instance() or QApplication(sys.argv)
         from ui.camera_player import CameraPlayer
-        cam_config = {"name": "Test", "url": "rtsp://mycam.dyndns.org:554/live", "type": "rtsp", "enabled": True, "username": "", "password": ""}
+        cam_config = {"name": "Test", "url": "rtsp://mycam.dyndns.org:554/live", "type": "rtsp", "enabled": True, "user": "", "password": ""}
         player = CameraPlayer(cam_config)
         assert player._build_stream_url() == "rtsp://mycam.dyndns.org:554/live"
 
@@ -52,7 +52,7 @@ def test_build_stream_url_embeds_credentials():
         from PyQt5.QtWidgets import QApplication
         app = QApplication.instance() or QApplication(sys.argv)
         from ui.camera_player import CameraPlayer
-        cam_config = {"name": "Test", "url": "rtsp://mycam.dyndns.org:554/live", "type": "rtsp", "enabled": True, "username": "admin", "password": "geheim"}
+        cam_config = {"name": "Test", "url": "rtsp://mycam.dyndns.org:554/live", "type": "rtsp", "enabled": True, "user": "admin", "password": "geheim"}
         player = CameraPlayer(cam_config)
         result = player._build_stream_url()
         assert "admin" in result
@@ -69,7 +69,7 @@ def test_build_stream_url_skips_existing_credentials():
         from PyQt5.QtWidgets import QApplication
         app = QApplication.instance() or QApplication(sys.argv)
         from ui.camera_player import CameraPlayer
-        cam_config = {"name": "Test", "url": "rtsp://user:pass@mycam.dyndns.org/live", "type": "rtsp", "enabled": True, "username": "other", "password": "other"}
+        cam_config = {"name": "Test", "url": "rtsp://user:pass@mycam.dyndns.org/live", "type": "rtsp", "enabled": True, "user": "other", "password": "other"}
         player = CameraPlayer(cam_config)
         result = player._build_stream_url()
         assert result == "rtsp://user:pass@mycam.dyndns.org/live"

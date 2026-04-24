@@ -9,8 +9,11 @@ Vollbild-Kameramonitor für den Raspberry Pi 3. Zeigt bis zu **8 IP-Kameras** (R
 - 8 Kameras auf 2 Seiten (je 2×2 Raster), Wischgesten-Navigation
 - Unterstützt RTSP- und MJPEG-Streams (via VLC)
 - Touchscreen-Einstellungsdialog — Kameras direkt auf dem Display konfigurieren
+- **Benutzername & Passwort** pro Kamera (z.B. für IP-Kameras hinter Fritzbox/DynDNS)
 - Automatische Wiederverbindung bei Verbindungsverlust (30 s)
 - Autostart per systemd-Service nach dem Hochfahren
+- Automatische Skalierung für verschiedene Display-Größen
+- Rotierendes Logfile für Fehlerdiagnose
 
 ## Screenshots
 
@@ -61,24 +64,63 @@ Alternativ direkt in `config.json` bearbeiten:
 ```json
 {
   "cameras": [
-    {"name": "Einfahrt",  "url": "rtsp://192.168.1.100/stream", "type": "rtsp",  "enabled": true},
-    {"name": "Garten",    "url": "http://192.168.1.101/mjpeg",  "type": "mjpeg", "enabled": true},
-    {"name": "Kamera 3",  "url": "",                            "type": "rtsp",  "enabled": false},
-    ...
+    {
+      "name": "Einfahrt",
+      "url": "rtsp://192.168.1.100/stream",
+      "type": "rtsp",
+      "enabled": true,
+      "user": "admin",
+      "password": "geheim"
+    },
+    {
+      "name": "Garten",
+      "url": "http://192.168.1.101/mjpeg",
+      "type": "mjpeg",
+      "enabled": true,
+      "user": "",
+      "password": ""
+    },
+    {
+      "name": "Kamera 3",
+      "url": "",
+      "type": "rtsp",
+      "enabled": false,
+      "user": "",
+      "password": ""
+    }
   ]
 }
 ```
 
-**Pflichtfelder je Eintrag:**
+**Felder je Eintrag:**
 
-| Feld      | Werte                  | Beschreibung               |
-|-----------|------------------------|----------------------------|
-| `name`    | beliebiger Text        | Anzeigename auf dem Display |
-| `url`     | RTSP- oder HTTP-URL    | Stream-Adresse             |
-| `type`    | `rtsp` oder `mjpeg`   | Stream-Protokoll           |
-| `enabled` | `true` / `false`      | Kamera aktiv?              |
+| Feld       | Werte                  | Beschreibung                                |
+|------------|------------------------|---------------------------------------------|
+| `name`     | beliebiger Text        | Anzeigename auf dem Display                  |
+| `url`      | RTSP- oder HTTP-URL    | Stream-Adresse (ohne Benutzer/Passwort)      |
+| `type`     | `rtsp` oder `mjpeg`   | Stream-Protokoll                             |
+| `enabled`  | `true` / `false`      | Kamera aktiv?                                |
+| `user`     | beliebiger Text        | Benutzername (optional, für Authentifizierung) |
+| `password` | beliebiger Text        | Passwort (optional, für Authentifizierung)    |
 
 > Es müssen **genau 8 Einträge** vorhanden sein.
+
+### Authentifizierung
+
+Benutzername und Passwort können entweder:
+- im **Einstellungsdialog** in den separaten Feldern eingegeben werden
+- direkt in der `config.json` als `user` / `password` hinterlegt werden
+
+Die Credentials werden automatisch in die Stream-URL eingebettet (`rtsp://user:pass@host:port/path`).
+Sonderzeichen werden automatisch URL-kodiert.
+
+**Typische Fritzbox + DynDNS-Szenarien:**
+
+| Szenario | Auth-Art | Beispiel |
+|----------|----------|----------|
+| IP-Kamera im Heimnetz | Benutzer + Passwort | `user: admin`, `password: geheim` |
+| Kamera über Fritzbox DynDNS | Fritzbox-User + Passwort | `user: fritzboxuser`, `password: ****` |
+| MJPEG über HTTP | Basic Auth | `user: camuser`, `password: ****` |
 
 ---
 
@@ -109,6 +151,10 @@ journalctl -u camera-view.service -f
 sudo systemctl disable camera-view.service
 ```
 
+### Logdatei
+
+Die Anwendung schreibt ein rotierendes Logfile nach `logs/kamerauebersicht.log` (max. 1 MB, 3 Backups). Console-Output ab `INFO`, Datei ab `DEBUG`.
+
 ---
 
 ## Entwicklung & Tests
@@ -128,13 +174,15 @@ python3 main.py
 
 ## Tech-Stack
 
-| Komponente   | Technologie             |
-|--------------|-------------------------|
-| GUI          | PyQt5 (QStackedWidget)  |
-| Videodekodierung | python-vlc (libVLC) |
-| Konfiguration | config.json            |
-| Autostart    | systemd                 |
-| Tests        | pytest + unittest.mock  |
+| Komponente       | Technologie             |
+|------------------|-------------------------|
+| GUI              | PyQt5 (QStackedWidget)  |
+| Videodekodierung | python-vlc (libVLC)     |
+| Konfiguration    | config.json             |
+| Authentifizierung | URL-Credentials        |
+| Autostart        | systemd                 |
+| Logging          | Python logging + RotatingFileHandler |
+| Tests            | pytest + unittest.mock  |
 
 ---
 
@@ -142,18 +190,21 @@ python3 main.py
 
 ```
 raspberry-kamera-uebersicht/
-├── main.py                  # Einstiegspunkt
+├── main.py                  # Einstiegspunkt + Logging-Setup
 ├── config.py                # Konfigurationsladung
 ├── config.json              # Kamera-Konfiguration
 ├── requirements.txt
 ├── camera-view.service      # systemd-Unit
 ├── install.sh               # Installationsskript
+├── logs/                    # Logdateien (automatisch erstellt)
 ├── ui/
-│   ├── camera_player.py     # VLC-Kachel
-│   ├── camera_grid.py       # 2x2-Raster
-│   ├── page_view.py         # Seitenverwaltung
-│   └── settings_dialog.py   # Einstellungsdialog
+│   ├── camera_player.py     # VLC-Kachel mit Credential-Handling
+│   ├── camera_grid.py       # 2×2-Raster mit Touch-Events
+│   ├── page_view.py         # Seitenverwaltung + Navigation
+│   ├── scale.py             # Display-Skalierung
+│   └── settings_dialog.py   # Einstellungsdialog mit Auth-Felder
 └── tests/
+    ├── conftest.py          # Qt-Test-Setup
     ├── test_config.py
     ├── test_camera_player.py
     ├── test_camera_grid.py

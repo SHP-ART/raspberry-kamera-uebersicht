@@ -1,12 +1,16 @@
+import logging
+import urllib.parse
+
 try:
     import vlc
 except (ImportError, OSError):
     vlc = None  # type: ignore
 
-import urllib.parse
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from ui.scale import scale
+
+logger = logging.getLogger(__name__)
 
 
 class CameraPlayer(QFrame):
@@ -130,23 +134,26 @@ class CameraPlayer(QFrame):
         self._pulse_timer.start()
 
     def _build_stream_url(self) -> str:
-        """Baut die Stream-URL mit optionalen Zugangsdaten zusammen."""
+        """Baut die finale Stream-URL mit eingebetteten Credentials."""
         url = self._config.get("url", "")
-        username = self._config.get("username", "").strip()
-        password = self._config.get("password", "").strip()
-        if not username or not url:
+        user = self._config.get("user", "")
+        password = self._config.get("password", "")
+        if not url or not user:
             return url
         try:
             parsed = urllib.parse.urlparse(url)
-            # Zugangsdaten nur einbauen, wenn noch keine vorhanden
-            if not parsed.username:
-                netloc = f"{urllib.parse.quote(username, safe='')}:{urllib.parse.quote(password, safe='')}@{parsed.hostname}"
-                if parsed.port:
-                    netloc += f":{parsed.port}"
-                url = parsed._replace(netloc=netloc).geturl()
+            # Credentials nur einbauen, wenn noch keine in der URL vorhanden
+            if parsed.username:
+                return url
+            userinfo = urllib.parse.quote(user, safe="")
+            if password:
+                userinfo += ":" + urllib.parse.quote(password, safe="")
+            netloc = userinfo + "@" + (parsed.hostname or "")
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            return urllib.parse.urlunparse(parsed._replace(netloc=netloc))
         except Exception:
-            pass
-        return url
+            return url
 
     def _init_vlc(self):
         if vlc is None:
@@ -163,25 +170,51 @@ class CameraPlayer(QFrame):
         em.event_attach(vlc.EventType.MediaPlayerPlaying, self._on_playing)
         em.event_attach(vlc.EventType.MediaPlayerEndReached, self._on_error)
         em.event_attach(vlc.EventType.MediaPlayerEncounteredError, self._on_error)
+        logger.debug("VLC initialisiert für %s", self._config.get('name', '?'))
 
     def _start_stream(self):
         if self._media_player is None:
             return
         self._reconnect_timer.stop()
-        url = self._build_stream_url()
-        media = self._vlc_instance.media_new(url)
+        stream_url = self._build_stream_url()
+        media = self._vlc_instance.media_new(stream_url)
         self._media_player.set_media(media)
         self._media_player.set_xwindow(int(self.winId()))
         self._media_player.play()
         self._state_changed.emit("no_signal")
+        logger.debug("Stream gestartet: %s -> %s", self._config.get('name', '?'),
+                      stream_url.split("@")[-1] if "@" in stream_url else stream_url)
 
     def _on_playing(self, event):
         """VLC-Callback — läuft in VLC-Background-Thread. Nur Signal emittieren."""
+        logger.debug("VLC playing: %s", self._config.get('name', '?'))
         self._state_changed.emit("playing")
 
     def _on_error(self, event):
         """VLC-Callback — läuft in VLC-Background-Thread. Nur Signal emittieren."""
+        logger.warning("VLC Fehler/Ende: %s", self._config.get('name', '?'))
         self._state_changed.emit("no_signal")
+
+    def _release_vlc(self):
+        """Gibt alle VLC-Ressourcen frei (Player + Instance)."""
+        if self._media_player is not None:
+            try:
+                self._media_player.stop()
+            except Exception:
+                pass
+            try:
+                self._media_player.release()
+            except Exception:
+                pass
+            self._media_player = None
+            logger.debug("VLC MediaPlayer freigegeben für %s", self._config.get('name', '?'))
+        if self._vlc_instance is not None:
+            try:
+                self._vlc_instance.release()
+            except Exception:
+                pass
+            self._vlc_instance = None
+            logger.debug("VLC Instance freigegeben für %s", self._config.get('name', '?'))
 
     def stop(self):
         if self._media_player:
@@ -192,14 +225,16 @@ class CameraPlayer(QFrame):
 
     def reload(self, cam_config: dict):
         self.stop()
+        self._release_vlc()
         self._config = cam_config
         self._name_label.setText(cam_config.get("name", ""))
         if self.is_placeholder:
             self._show_placeholder()
+            logger.info("Kamera %s: Platzhalter (deaktiviert oder keine URL)", cam_config.get('name', '?'))
         else:
-            if self._vlc_instance is None:
-                self._init_vlc()
+            self._init_vlc()
             self._start_stream()
+            logger.info("Kamera %s: Stream neu gestartet -> %s", cam_config.get('name', '?'), cam_config.get('url', ''))
 
     def mouseDoubleClickEvent(self, event):
         if not self.is_placeholder:
