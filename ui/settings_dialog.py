@@ -49,6 +49,29 @@ class SettingsDialog(QDialog):
     self._refresh_list()
     list_layout.addWidget(self._list_widget, 1)
 
+    # --- Fehler-Reporting Schalter ---
+    report_row = QHBoxLayout()
+    report_label = QLabel("Fehler-Reporting", list_page)
+    report_label.setStyleSheet(f"color: #888888; font-size: {scale(12)}px;")
+    report_info = QLabel("Sendet Absturzmeldungen an den Entwickler", list_page)
+    report_info.setStyleSheet(f"color: #555555; font-size: {scale(10)}px;")
+    self._report_btn = QPushButton("AKTIVIERT", list_page)
+    self._report_btn.setCheckable(True)
+    self._report_btn.setChecked(self._load_error_reporting())
+    self._report_btn.setText("AKTIVIERT" if self._report_btn.isChecked() else "DEAKTIVIERT")
+    self._report_btn.setFixedHeight(scale(32))
+    self._report_btn.setStyleSheet(
+      "QPushButton:checked { background-color: #4caf50; color: white; } "
+      "QPushButton:!checked { background-color: #555555; color: #aaaaaa; } "
+      f"QPushButton {{ border: none; padding: 2px {scale(12)}px; font-size: {scale(12)}px; font-weight: bold; }}"
+    )
+    self._report_btn.clicked.connect(self._toggle_reporting)
+    report_row.addWidget(report_label)
+    report_row.addStretch()
+    report_row.addWidget(self._report_btn)
+    list_layout.addLayout(report_row)
+    list_layout.addWidget(report_info)
+
     btn_row = QHBoxLayout()
     cancel_btn = QPushButton("Abbrechen")
     cancel_btn.setStyleSheet(f"background-color: #333333; color: #aaaaaa; padding: {scale(10)}px {scale(20)}px; font-size: {scale(14)}px;")
@@ -153,6 +176,21 @@ class SettingsDialog(QDialog):
     detail_btn_row.addWidget(apply_btn)
     detail_layout.addLayout(detail_btn_row)
     self._stack.addWidget(detail_page)
+
+  def _load_error_reporting(self) -> bool:
+    """Liest den error_reporting Status aus der config.json."""
+    try:
+      project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+      config_path = os.path.join(project_dir, "config.json")
+      with open(config_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+      return data.get("error_reporting", True)
+    except Exception:
+      return True
+
+  def _toggle_reporting(self):
+    checked = self._report_btn.isChecked()
+    self._report_btn.setText("AKTIVIERT" if checked else "DEAKTIVIERT")
 
   def _refresh_list(self):
     self._list_widget.clear()
@@ -321,7 +359,17 @@ class SettingsDialog(QDialog):
     config_path = os.path.join(project_dir, "config.json")
     self._logger.info("Speichere Konfiguration nach %s", config_path)
     cfg.save_config(config_path, self._pending)
-    self._logger.debug("Konfiguration gespeichert: %d Kameras", len(self._pending))
+    # error_reporting separat speichern (ist kein Kamera-Eintrag)
+    try:
+      with open(config_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+      data["error_reporting"] = self._report_btn.isChecked()
+      with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception:
+      pass
+    self._logger.debug("Konfiguration gespeichert: %d Kameras, reporting=%s",
+                        len(self._pending), self._report_btn.isChecked())
 
   def get_cameras(self) -> list:
     if self._accepted:

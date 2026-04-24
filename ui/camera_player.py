@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 class CameraPlayer(QFrame):
 
     RECONNECT_INTERVAL_MS = 30_000
+    NO_SIGNAL_REPORT_THRESHOLD = 5  # Nach 5 Fehlern → Fehlerbericht senden
 
     _state_changed = pyqtSignal(str)  # "playing" | "no_signal"
     fullscreen_requested = pyqtSignal(dict)
@@ -25,6 +26,8 @@ class CameraPlayer(QFrame):
         self._config = cam_config
         self._vlc_instance = None
         self._media_player = None
+        self._no_signal_count = 0
+        self._reported_no_signal = False
 
         self._reconnect_timer = QTimer(self)
         self._reconnect_timer.setInterval(self.RECONNECT_INTERVAL_MS)
@@ -101,9 +104,35 @@ class CameraPlayer(QFrame):
     def _apply_state(self, state: str):
         """Wird immer im Main-Thread aufgerufen (via Signal)."""
         if state == "playing":
+            self._no_signal_count = 0
+            self._reported_no_signal = False
             self._hide_overlay()
         else:
+            self._no_signal_count += 1
+            self._check_no_signal_report()
             self._show_no_signal()
+
+    def _check_no_signal_report(self):
+        """Sendet Fehlerbericht wenn Schwelle überschritten."""
+        if (
+            self._no_signal_count >= self.NO_SIGNAL_REPORT_THRESHOLD
+            and not self._reported_no_signal
+        ):
+            self._reported_no_signal = True
+            try:
+                import os
+                from error_report import send_no_signal
+                config_path = os.environ.get(
+                    "KAMERA_CONFIG_PATH",
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json"),
+                )
+                send_no_signal(
+                    self._config.get("name", "Unbekannt"),
+                    self._no_signal_count,
+                    config_path,
+                )
+            except Exception:
+                pass  # Reporting darf niemals crashen
 
     def _show_placeholder(self):
         self._overlay.setText(f"+\n{self._config.get('name', 'Nicht konfiguriert')}")
@@ -228,6 +257,8 @@ class CameraPlayer(QFrame):
         self._release_vlc()
         self._config = cam_config
         self._name_label.setText(cam_config.get("name", ""))
+        self._no_signal_count = 0
+        self._reported_no_signal = False
         if self.is_placeholder:
             self._show_placeholder()
             logger.info("Kamera %s: Platzhalter (deaktiviert oder keine URL)", cam_config.get('name', '?'))

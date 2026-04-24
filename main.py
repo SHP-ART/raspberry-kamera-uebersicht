@@ -41,9 +41,27 @@ def setup_logging() -> None:
     logging.getLogger(__name__).info("Logging initialisiert")
 
 
+def _global_exception_handler(exc_type, exc_value, exc_tb):
+    """Fängt alle unbehandelten Exceptions und sendet Absturzbericht."""
+    logger.critical("Unbehandelte Exception", exc_info=(exc_type, exc_value, exc_tb))
+
+    # Fehlerbericht senden (still, kein Crash wenn das auch fehlschlägt)
+    try:
+        from error_report import send_crash
+        config_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "config.json"
+        )
+        send_crash(exc_type.__name__, str(exc_value), config_path)
+    except Exception:
+        pass  # Reporting darf niemals crashen
+
+
 def main() -> None:
     setup_logging()
     logger = logging.getLogger(__name__)
+
+    # Globaler Exception-Handler
+    sys.excepthook = _global_exception_handler
 
     os.environ.setdefault("DISPLAY", ":0")
     os.environ.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
@@ -53,6 +71,9 @@ def main() -> None:
 
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     cameras = load_config(config_path)
+
+    # config_path für Fehler-Reporting verfügbar machen
+    os.environ["KAMERA_CONFIG_PATH"] = config_path
 
     window = PageView(cameras)
     window.setWindowTitle("Kameraübersicht")

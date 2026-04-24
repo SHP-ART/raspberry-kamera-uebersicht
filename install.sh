@@ -20,6 +20,27 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[FEHLER]${NC}  $*" >&2; }
 step()  { echo -e "\n${CYAN}=== $* ===${NC}"; }
 
+# ─── Fehler-Reporting (ntfy.sh) ─────────────────────────────────────────────
+NTFY_TOPIC="kamera-shp-art-7f3x9k"
+
+report_install_error() {
+    # Sendet Installationsfehler an den Entwickler (still, kein Crash wenns fehlschlägt)
+    local step_name="$1"
+    local error_msg="$2"
+    local hostname_str
+    hostname_str=$(hostname 2>/dev/null || echo "unknown")
+    local os_str
+    os_str=$(cat /etc/os-release 2>/dev/null | grep "^PRETTY_NAME=" | cut -d'"' -f2 || echo "unknown")
+    # Sensible Daten herausfiltern
+    error_msg=$(echo "$error_msg" | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/<IP>/g' | sed -E 's/(password|token|secret)[=:][^ ]+/\1=***/gi')
+    curl -s -S --max-time 10 \
+        -H "Title: Installation fehlgeschlagen: $step_name" \
+        -H "Priority: high" \
+        -H "Tags: rotating_light" \
+        -d "Schritt: $step_name\nFehler: $error_msg\nHost: $hostname_str | OS: $os_str" \
+        "https://ntfy.sh/$NTFY_TOPIC" 2>/dev/null || true
+}
+
 # ─── Prüfungen ───────────────────────────────────────────────────────────────
 CURRENT_USER="${SUDO_USER:-$(whoami)}"
 # Wenn mit sudo aufgerufen, SUDO_USER nutzen; sonst whoami
@@ -59,6 +80,7 @@ fi
 step "Prüfe Internetverbindung"
 if ! ping -c 1 -W 5 1.1.1.1 &>/dev/null && ! ping -c 1 -W 5 8.8.8.8 &>/dev/null; then
     error "Kein Internet! Bitte Netzwerkverbindung herstellen und erneut versuchen."
+    report_install_error "Internet-Check" "Kein Internet (ping 1.1.1.1 + 8.8.8.8 fehlgeschlagen)"
     exit 1
 fi
 info "Internetverbindung vorhanden."
@@ -67,6 +89,7 @@ info "Internetverbindung vorhanden."
 step "Systempakete aktualisieren"
 sudo apt-get update -y || {
     error "apt-get update fehlgeschlagen."
+    report_install_error "apt-get update" "apt-get update fehlgeschlagen"
     exit 1
 }
 
@@ -143,6 +166,7 @@ sudo apt-get install -y "${ALL_PACKAGES[@]}" || {
     if [ ${#FAILED[@]} -gt 0 ]; then
         error "Folgende Pakete fehlgeschlagen: ${FAILED[*]}"
         error "Bitte manuell installieren und Installer erneut ausführen."
+        report_install_error "apt-get install" "Pakete fehlgeschlagen: ${FAILED[*]}"
         exit 1
     fi
 }
@@ -166,10 +190,12 @@ if [ -d "$INSTALL_DIR/.git" ]; then
     info "Aktualisiere bestehende Installation..."
     git -C "$INSTALL_DIR" fetch origin "$BRANCH" || {
         error "Git fetch fehlgeschlagen. Prüfe Internetverbindung."
+        report_install_error "git fetch" "Git fetch fehlgeschlagen für $REPO_URL"
         exit 1
     }
     git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH" || {
         error "Git update fehlgeschlagen."
+        report_install_error "git reset" "Git reset --hard fehlgeschlagen"
         exit 1
     }
     info "Repository aktualisiert."
@@ -177,6 +203,7 @@ else
     info "Klone Repository nach $INSTALL_DIR ..."
     git clone -b "$BRANCH" "$REPO_URL" "$INSTALL_DIR" || {
         error "Git clone fehlgeschlagen. Prüfe Internetverbindung und URL."
+        report_install_error "git clone" "Git clone fehlgeschlagen: $REPO_URL"
         exit 1
     }
     chown -R "$CURRENT_USER":"$CURRENT_USER" "$INSTALL_DIR"

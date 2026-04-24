@@ -8,5 +8,6 @@
     {"name": "Kamera 6", "url": "", "type": "rtsp", "enabled": false, "user": "", "password": ""},
     {"name": "Kamera 7", "url": "", "type": "rtsp", "enabled": false, "user": "", "password": ""},
     {"name": "Kamera 8", "url": "", "type": "rtsp", "enabled": false, "user": "", "password": ""}
-  ]
+  ],
+  "error_reporting": true
 }
