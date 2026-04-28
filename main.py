@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QApplication
 
 from config import load_config
@@ -56,6 +56,20 @@ def _global_exception_handler(exc_type, exc_value, exc_tb):
         pass  # Reporting darf niemals crashen
 
 
+def show_main_window_in_foreground(window: PageView) -> None:
+    """Zeigt das Hauptfenster fullscreen und fordert den Vordergrund erneut an."""
+    window.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+    window.showFullScreen()
+
+    def bring_to_front() -> None:
+        window.raise_()
+        window.activateWindow()
+
+    bring_to_front()
+    QTimer.singleShot(250, bring_to_front)
+    QTimer.singleShot(1000, bring_to_front)
+
+
 def main() -> None:
     setup_logging()
     logger = logging.getLogger(__name__)
@@ -77,7 +91,7 @@ def main() -> None:
 
     window = PageView(cameras)
     window.setWindowTitle("Kameraübersicht")
-    window.showFullScreen()
+    show_main_window_in_foreground(window)
 
     logger.info("Anwendung gestartet – Vollbildmodus")
     sys.exit(app.exec_())
