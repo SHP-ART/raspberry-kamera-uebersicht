@@ -127,9 +127,14 @@ class PageView(QWidget):
             self._fullscreen_overlay.close_overlay()
         overlay = _FullscreenOverlay(cam_config, self)
         overlay.setGeometry(0, 0, self.width(), self.height())
+        self._fullscreen_overlay = overlay
+        overlay.destroyed.connect(lambda: self._clear_fullscreen_overlay(overlay))
         overlay.show()
         overlay.raise_()
-        self._fullscreen_overlay = overlay
+
+    def _clear_fullscreen_overlay(self, overlay: _FullscreenOverlay):
+        if self._fullscreen_overlay is overlay:
+            self._fullscreen_overlay = None
 
     def _open_settings(self):
         # Deferred import to avoid circular dependency (SettingsDialog -> CameraPlayer -> ...)

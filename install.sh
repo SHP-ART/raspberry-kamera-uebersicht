@@ -252,10 +252,6 @@ sed \
     -e "s|XDG_RUNTIME_DIR=/run/user/1000|XDG_RUNTIME_DIR=/run/user/$USER_UID|g" \
     "$SERVICE_SRC" | sudo tee "$SERVICE_DST" > /dev/null
 
-# Service-Datei um sichereren Start erweitern
-# (Nach graphical.target warten bis der Display-Manager bereit ist)
-sudo sed -i 's|After=graphical.target|After=graphical.target display-manager.service|' "$SERVICE_DST" 2>/dev/null || true
-
 sudo systemctl daemon-reload
 sudo systemctl enable camera-view.service
 

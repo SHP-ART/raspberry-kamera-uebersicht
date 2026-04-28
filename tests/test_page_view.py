@@ -55,3 +55,14 @@ def test_reload_all_delegates_to_both_grids(page_view):
     page_view.reload_all(new_cams)
     page_view._grid_page1.reload_cameras.assert_called_once_with(new_cams[0:4])
     page_view._grid_page2.reload_cameras.assert_called_once_with(new_cams[4:8])
+
+
+def test_fullscreen_overlay_reference_is_cleared_when_destroyed(page_view):
+    with patch("ui.page_view._FullscreenOverlay") as overlay_cls:
+        overlay = MagicMock()
+        overlay.destroyed.connect.side_effect = lambda callback: callback()
+        overlay_cls.return_value = overlay
+
+        page_view._show_fullscreen({"name": "Kamera", "url": "rtsp://cam/live", "enabled": True})
+
+    assert page_view._fullscreen_overlay is None

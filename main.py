@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import QApplication
 from config import load_config
 from ui.page_view import PageView
 
+logger = logging.getLogger(__name__)
+
 
 def setup_logging() -> None:
     """Konfiguriert Logging: Console + Datei für Debugging auf dem Pi."""
@@ -38,7 +40,16 @@ def setup_logging() -> None:
         handlers = [console_handler]
 
     logging.basicConfig(level=logging.DEBUG, handlers=handlers)
-    logging.getLogger(__name__).info("Logging initialisiert")
+    logger.info("Logging initialisiert")
+
+
+def send_crash_report(exc_type_name: str, exc_message: str) -> None:
+    from error_report import send_crash
+
+    config_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "config.json"
+    )
+    send_crash(exc_type_name, exc_message, config_path)
 
 
 def _global_exception_handler(exc_type, exc_value, exc_tb):
@@ -47,13 +58,14 @@ def _global_exception_handler(exc_type, exc_value, exc_tb):
 
     # Fehlerbericht senden (still, kein Crash wenn das auch fehlschlägt)
     try:
-        from error_report import send_crash
-        config_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "config.json"
-        )
-        send_crash(exc_type.__name__, str(exc_value), config_path)
+        send_crash_report(exc_type.__name__, str(exc_value))
     except Exception:
         pass  # Reporting darf niemals crashen
+
+
+def create_application(argv: list[str]) -> QApplication:
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    return QApplication(argv)
 
 
 def show_main_window_in_foreground(window: PageView) -> None:
@@ -72,7 +84,6 @@ def show_main_window_in_foreground(window: PageView) -> None:
 
 def main() -> None:
     setup_logging()
-    logger = logging.getLogger(__name__)
 
     # Globaler Exception-Handler
     sys.excepthook = _global_exception_handler
@@ -80,8 +91,7 @@ def main() -> None:
     os.environ.setdefault("DISPLAY", ":0")
     os.environ.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
 
-    app = QApplication(sys.argv)
-    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    app = create_application(sys.argv)
 
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     cameras = load_config(config_path)

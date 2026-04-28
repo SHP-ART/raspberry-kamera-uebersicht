@@ -7,7 +7,6 @@ Wants=display-manager.service
 User=pi
 Environment=DISPLAY=:0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-Environment=QT_QPA_PLATFORM=linuxfb
 WorkingDirectory=/home/pi/raspberry-kamera-uebersicht
 ExecStartPre=/bin/sleep 5
 ExecStart=/usr/bin/python3 /home/pi/raspberry-kamera-uebersicht/main.py

@@ -28,3 +28,16 @@ def test_install_script_installs_from_main_branch():
     script = INSTALL_SCRIPT.read_text(encoding="utf-8")
 
     assert 'BRANCH="main"' in script
+
+
+def test_install_script_does_not_duplicate_display_manager_dependency():
+    script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+    assert "s|After=graphical.target|After=graphical.target display-manager.service|" not in script
+
+
+def test_service_uses_desktop_qt_platform():
+    service = (INSTALL_SCRIPT.parent / "camera-view.service").read_text(encoding="utf-8")
+
+    assert "QT_QPA_PLATFORM=linuxfb" not in service
+    assert "DISPLAY=:0" in service
