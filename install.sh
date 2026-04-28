@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/SHP-ART/raspberry-kamera-uebersicht.git"
-BRANCH="master"
+BRANCH="main"
 
 # ─── Farben ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -113,9 +113,7 @@ VLC_PACKAGES=(
 
 # Display-Server – prüfen ob ein Desktop installiert ist
 HAS_DISPLAY=false
-if dpkg -l python3-pyqt5 &>/dev/null 2>&1; then
-    HAS_DISPLAY=true
-elif dpkg -l raspberrypi-ui-mods &>/dev/null 2>&1; then
+if dpkg -l raspberrypi-ui-mods &>/dev/null 2>&1; then
     HAS_DISPLAY=true
 elif [ -d /usr/share/xsessions ] || [ -d /usr/share/wayland-sessions ]; then
     HAS_DISPLAY=true
@@ -180,6 +178,24 @@ if ! python3 -c "import vlc" 2>/dev/null; then
         warn "Auch pip-Installation fehlgeschlagen. VLC wird zur Laufzeit benötigt."
     fi
 fi
+
+step "Python-Abhängigkeiten prüfen"
+
+if ! python3 -c "from PyQt5.QtCore import Qt; from PyQt5.QtWidgets import QApplication" 2>/dev/null; then
+    error "PyQt5 ist nach der Installation nicht importierbar."
+    error "Benötigtes Paket: python3-pyqt5"
+    report_install_error "Python-Abhängigkeiten" "PyQt5 Import fehlgeschlagen"
+    exit 1
+fi
+info "PyQt5 importierbar."
+
+if ! python3 -c "import vlc; vlc.Instance('--no-xlib', '--quiet')" 2>/dev/null; then
+    error "python-vlc/libVLC ist nach der Installation nicht nutzbar."
+    error "Benötigte Pakete: vlc python3-vlc"
+    report_install_error "Python-Abhängigkeiten" "python-vlc/libVLC Initialisierung fehlgeschlagen"
+    exit 1
+fi
+info "python-vlc/libVLC nutzbar."
 
 info "Alle Systempakete installiert."
 
